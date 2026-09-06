@@ -3,6 +3,12 @@
 PNGタイルを読み込み、デスクトップ上をバウンドするアニメーションを表示するWindows向けアプリです。
 GPUレンダリングによりそこそこ低負荷です。たぶん。
 
+## ダウンロード
+
+最新版は [Releases](https://github.com/tat80/sinonome-bouncer/releases/) からダウンロードできます。
+
+ダウンロードしたzipファイルを展開したフォルダの中の `sinonome_bouncer.exe` を実行してください。
+
 ## 実行
 
 - `Microsoft Visual C++ 2015-2022 再頒布可能パッケージ（x64）`が必要です。入っていない場合は、予めインストールしておいてください。
