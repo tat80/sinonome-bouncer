@@ -1,0 +1,7 @@
+frame_count=5
+scale=1.0
+anim_fps=5.0
+# コマごとの表示時間（ミリ秒）。frame_countと同じ個数を指定します。
+# frame_delays_msを指定した場合、anim_fpsは無視されます。
+frame_delays_ms=200,100,100,100,140
+speed=1.7

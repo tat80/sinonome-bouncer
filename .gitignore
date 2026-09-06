@@ -1,4 +1,4 @@
 target/
 release/
 
-.url
+*.url
