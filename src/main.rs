@@ -13,6 +13,7 @@ use std::path::Path;
 use winit::event_loop::EventLoop;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
+    platform::set_process_dpi_awareness();
     let config = config::read()?;
     let animation_path = Path::new(config::ANIMATION_FILE);
     if !animation_path.exists() {

@@ -16,6 +16,17 @@ pub struct AppWindow {
     pub _event_window: Arc<Window>,
 }
 
+pub fn set_process_dpi_awareness() {
+    #[cfg(windows)]
+    unsafe {
+        use windows_sys::Win32::UI::HiDpi::{
+            SetProcessDpiAwarenessContext, DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2,
+        };
+
+        SetProcessDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2);
+    }
+}
+
 pub fn virtual_work_area() -> (i32, i32, u32, u32) {
     #[cfg(windows)]
     unsafe {
