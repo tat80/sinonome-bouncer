@@ -11,7 +11,6 @@ use winit::{
     window::WindowId,
 };
 
-const USE_DIRECT_COMPOSITION: bool = true;
 const UPDATE_INTERVAL: Duration = Duration::from_nanos(1_000_000_000 / 60);
 const BASE_SPEED_PIXELS_PER_SECOND: f64 = 1000.0;
 const MAX_UPDATE_INTERVAL: Duration = Duration::from_millis(100);
@@ -146,11 +145,7 @@ impl ApplicationHandler for Bouncer {
             self.atlas.height,
         );
         let created = platform::make_window(event_loop, initial_area);
-        let mut renderer = if USE_DIRECT_COMPOSITION {
-            LayeredRenderer::new(created.hwnd, self.atlas.width, self.atlas.height)
-        } else {
-            LayeredRenderer::new_hardware(created.hwnd, self.atlas.width, self.atlas.height)
-        };
+        let mut renderer = LayeredRenderer::new(created.hwnd, self.atlas.width, self.atlas.height);
         if let Some(frame) = self.atlas.frame(0) {
             renderer.present(frame);
         }

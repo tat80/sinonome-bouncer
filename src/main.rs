@@ -45,7 +45,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             return Ok(());
         }
     };
-    let area = platform::virtual_work_area();
+    let area = platform::virtual_work_area(config.monitor)?;
     let (tray_icon, quit_item_id) = tray::setup(&atlas)?;
     let event_loop = EventLoop::new()?;
     let mut app = Bouncer::new(atlas, area, config.bounce_speed, tray_icon, quit_item_id);

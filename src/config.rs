@@ -8,6 +8,13 @@ pub struct Config {
     pub scale: f64,
     pub frame_delays: Vec<u16>,
     pub bounce_speed: f64,
+    pub monitor: MonitorSelection,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum MonitorSelection {
+    All,
+    Number(u32),
 }
 
 pub fn read() -> io::Result<Config> {
@@ -39,17 +46,6 @@ fn parse(text: &str) -> io::Result<Config> {
                 format!("config.txtに{key}がありません"),
             )
         })
-    };
-    let get_compatible = |current: &str, legacy: &str| {
-        values
-            .get(current)
-            .or_else(|| values.get(legacy))
-            .ok_or_else(|| {
-                io::Error::new(
-                    io::ErrorKind::InvalidData,
-                    format!("config.txtに{current}がありません"),
-                )
-            })
     };
     let frame_count: u32 = get("frame_count")?.parse().map_err(io::Error::other)?;
     if frame_count == 0 {
@@ -88,9 +84,7 @@ fn parse(text: &str) -> io::Result<Config> {
         }
         delays
     } else {
-        let fps: f64 = get_compatible("anim_fps", "fps")?
-            .parse()
-            .map_err(io::Error::other)?;
+        let fps: f64 = get("anim_fps")?.parse().map_err(io::Error::other)?;
         if !fps.is_finite() || fps <= 0.0 {
             return Err(io::Error::new(
                 io::ErrorKind::InvalidData,
@@ -106,26 +100,37 @@ fn parse(text: &str) -> io::Result<Config> {
             "scaleには0より大きい有限の数値を指定してください",
         ));
     }
-    let bounce_speed: f64 = get_compatible("speed", "bounce_speed")?
-        .parse()
-        .map_err(io::Error::other)?;
+    let bounce_speed: f64 = get("speed")?.parse().map_err(io::Error::other)?;
     if !bounce_speed.is_finite() || bounce_speed < 0.0 {
         return Err(io::Error::new(
             io::ErrorKind::InvalidData,
             "speedには0以上の有限の数値を指定してください",
         ));
     }
+    let monitor = match values.get("monitor").map(String::as_str).unwrap_or("all") {
+        "all" => MonitorSelection::All,
+        value => value.parse::<u32>().ok().filter(|number| *number > 0).map_or_else(
+            || {
+                Err(io::Error::new(
+                    io::ErrorKind::InvalidData,
+                    "monitorにはallまたは1以上のモニタ番号を指定してください",
+                ))
+            },
+            |number| Ok(MonitorSelection::Number(number)),
+        )?,
+    };
     Ok(Config {
         frame_count,
         scale,
         frame_delays,
         bounce_speed,
+        monitor,
     })
 }
 
 #[cfg(test)]
 mod tests {
-    use super::parse;
+    use super::{parse, MonitorSelection};
 
     const VALID_CONFIG: &str = "\
 frame_count=2
@@ -139,6 +144,22 @@ speed=1.0
         let config = parse(VALID_CONFIG).unwrap();
         assert_eq!(config.frame_count, 2);
         assert_eq!(config.frame_delays, vec![200, 200]);
+        assert_eq!(config.monitor, MonitorSelection::All);
+    }
+
+    #[test]
+    fn parses_monitor_number() {
+        let config = parse("frame_count=1\nscale=1.0\nanim_fps=5.0\nspeed=1.0\nmonitor=2\n")
+            .unwrap();
+        assert_eq!(config.monitor, MonitorSelection::Number(2));
+    }
+
+    #[test]
+    fn parses_per_frame_delays() {
+        let config =
+            parse("frame_count=2\nscale=1.0\nanim_fps=5.0\nframe_delays_ms=200,100\nspeed=1.0\n")
+                .unwrap();
+        assert_eq!(config.frame_delays, vec![200, 100]);
     }
 
     #[test]

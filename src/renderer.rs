@@ -1,12 +1,5 @@
-#[cfg(not(windows))]
-use std::sync::Arc;
-#[cfg(not(windows))]
-use winit::window::Window;
-
-#[cfg(windows)]
 use windows::core::Interface;
 
-#[cfg(windows)]
 pub struct LayeredRenderer {
     context: windows::Win32::Graphics::Direct3D11::ID3D11DeviceContext,
     target: windows::Win32::Graphics::Direct3D11::ID3D11RenderTargetView,
@@ -20,7 +13,6 @@ pub struct LayeredRenderer {
     _visual: Option<windows::Win32::Graphics::DirectComposition::IDCompositionVisual>,
 }
 
-#[cfg(windows)]
 impl LayeredRenderer {
     pub fn new(hwnd: *mut core::ffi::c_void, width: u32, height: u32) -> Self {
         use windows::Win32::Foundation::{HMODULE, HWND};
@@ -122,85 +114,6 @@ impl LayeredRenderer {
         }
     }
 
-    pub fn new_hardware(hwnd: *mut core::ffi::c_void, width: u32, height: u32) -> Self {
-        use windows::Win32::Foundation::{HMODULE, HWND};
-        use windows::Win32::Graphics::Direct3D::D3D_DRIVER_TYPE_HARDWARE;
-        use windows::Win32::Graphics::Direct3D11::{
-            D3D11CreateDevice, D3D11_CREATE_DEVICE_BGRA_SUPPORT, D3D11_SDK_VERSION,
-        };
-        use windows::Win32::Graphics::Dxgi::{
-            Common::{DXGI_ALPHA_MODE_IGNORE, DXGI_FORMAT_B8G8R8A8_UNORM},
-            CreateDXGIFactory2, IDXGIFactory2, DXGI_CREATE_FACTORY_FLAGS, DXGI_SCALING_STRETCH,
-            DXGI_SWAP_CHAIN_DESC1, DXGI_SWAP_EFFECT_FLIP_SEQUENTIAL,
-            DXGI_USAGE_RENDER_TARGET_OUTPUT,
-        };
-
-        unsafe {
-            let mut device = None;
-            let mut context = None;
-            D3D11CreateDevice(
-                None,
-                D3D_DRIVER_TYPE_HARDWARE,
-                HMODULE::default(),
-                D3D11_CREATE_DEVICE_BGRA_SUPPORT,
-                None,
-                D3D11_SDK_VERSION,
-                Some(&mut device),
-                None,
-                Some(&mut context),
-            )
-            .expect("D3D11デバイスを作成できません");
-            let device = device.expect("D3D11デバイスがありません");
-            let context = context.expect("D3D11コンテキストがありません");
-            let factory: IDXGIFactory2 = CreateDXGIFactory2(DXGI_CREATE_FACTORY_FLAGS(0))
-                .expect("DXGIファクトリを作成できません");
-            let swap_chain = factory
-                .CreateSwapChainForHwnd(
-                    &device,
-                    HWND(hwnd as _),
-                    &DXGI_SWAP_CHAIN_DESC1 {
-                        Width: width,
-                        Height: height,
-                        Format: DXGI_FORMAT_B8G8R8A8_UNORM,
-                        Stereo: false.into(),
-                        SampleDesc: windows::Win32::Graphics::Dxgi::Common::DXGI_SAMPLE_DESC {
-                            Count: 1,
-                            Quality: 0,
-                        },
-                        BufferUsage: DXGI_USAGE_RENDER_TARGET_OUTPUT,
-                        BufferCount: 2,
-                        Scaling: DXGI_SCALING_STRETCH,
-                        SwapEffect: DXGI_SWAP_EFFECT_FLIP_SEQUENTIAL,
-                        AlphaMode: DXGI_ALPHA_MODE_IGNORE,
-                        Flags: 0,
-                    },
-                    None,
-                    None,
-                )
-                .expect("HWND swap chain を作成できません");
-            let back_buffer: windows::Win32::Graphics::Direct3D11::ID3D11Texture2D = swap_chain
-                .GetBuffer(0)
-                .expect("swap chain のバッファを取得できません");
-            let mut target = None;
-            device
-                .CreateRenderTargetView(&back_buffer, None, Some(&mut target))
-                .expect("swap chain の描画先を作成できません");
-            let upload = create_upload_texture(&device, width, height);
-            Self {
-                context,
-                target: target.expect("swap chain の描画先がありません"),
-                back_buffer,
-                upload,
-                width,
-                height,
-                swap_chain,
-                composition: None,
-                _composition_target: None,
-                _visual: None,
-            }
-        }
-    }
-
     pub fn present(&mut self, rgba: &[u8]) {
         use windows::Win32::Graphics::Dxgi::DXGI_PRESENT;
         unsafe {
@@ -257,7 +170,6 @@ impl LayeredRenderer {
     }
 }
 
-#[cfg(windows)]
 unsafe fn create_upload_texture(
     device: &windows::Win32::Graphics::Direct3D11::ID3D11Device,
     width: u32,
@@ -291,16 +203,4 @@ unsafe fn create_upload_texture(
         )
         .expect("GPU テクスチャを作成できません");
     texture.expect("GPU テクスチャがありません")
-}
-
-#[cfg(not(windows))]
-pub struct LayeredRenderer;
-
-#[cfg(not(windows))]
-impl LayeredRenderer {
-    pub fn new(_window: &Arc<Window>, _width: u32, _height: u32) -> Self {
-        Self
-    }
-
-    pub fn present(&mut self, _rgba: &[u8]) {}
 }

@@ -1,23 +1,21 @@
-use std::sync::Arc;
+use std::{io, sync::Arc};
+use windows_sys::Win32::Foundation::{BOOL, LPARAM};
+use windows_sys::Win32::Graphics::Gdi::{
+    EnumDisplayMonitors, GetMonitorInfoW, HDC, HMONITOR, MONITORINFO,
+};
+use crate::config::MonitorSelection;
 use winit::{
     dpi::PhysicalSize,
     event_loop::ActiveEventLoop,
     window::{Window, WindowAttributes},
 };
 
-#[cfg(windows)]
 pub struct AppWindow {
     pub _event_window: Arc<Window>,
     pub hwnd: *mut core::ffi::c_void,
 }
 
-#[cfg(not(windows))]
-pub struct AppWindow {
-    pub _event_window: Arc<Window>,
-}
-
 pub fn set_process_dpi_awareness() {
-    #[cfg(windows)]
     unsafe {
         use windows_sys::Win32::UI::HiDpi::{
             SetProcessDpiAwarenessContext, DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2,
@@ -27,24 +25,59 @@ pub fn set_process_dpi_awareness() {
     }
 }
 
-pub fn virtual_work_area() -> (i32, i32, u32, u32) {
-    #[cfg(windows)]
-    unsafe {
-        use windows_sys::Win32::UI::WindowsAndMessaging::{
-            GetSystemMetrics, SM_CXVIRTUALSCREEN, SM_CYVIRTUALSCREEN, SM_XVIRTUALSCREEN,
-            SM_YVIRTUALSCREEN,
+pub fn virtual_work_area(selection: MonitorSelection) -> io::Result<(i32, i32, u32, u32)> {
+    if selection == MonitorSelection::All {
+        unsafe {
+            use windows_sys::Win32::UI::WindowsAndMessaging::{
+                GetSystemMetrics, SM_CXVIRTUALSCREEN, SM_CYVIRTUALSCREEN, SM_XVIRTUALSCREEN,
+                SM_YVIRTUALSCREEN,
+            };
+            return Ok((
+                GetSystemMetrics(SM_XVIRTUALSCREEN),
+                GetSystemMetrics(SM_YVIRTUALSCREEN),
+                GetSystemMetrics(SM_CXVIRTUALSCREEN) as u32,
+                GetSystemMetrics(SM_CYVIRTUALSCREEN) as u32,
+            ));
+        }
+    }
+    let monitor_number = match selection {
+        MonitorSelection::Number(number) => number,
+        MonitorSelection::All => unreachable!(),
+    };
+    let mut monitors = Vec::new();
+    unsafe extern "system" fn collect_monitor(
+        monitor: HMONITOR,
+        _device_context: HDC,
+        _monitor_rect: *mut windows_sys::Win32::Foundation::RECT,
+        data: LPARAM,
+    ) -> BOOL {
+        let monitors = &mut *(data as *mut Vec<(i32, i32, u32, u32)>);
+        let mut info = MONITORINFO {
+            cbSize: std::mem::size_of::<MONITORINFO>() as u32,
+            ..std::mem::zeroed()
         };
-        (
-            GetSystemMetrics(SM_XVIRTUALSCREEN),
-            GetSystemMetrics(SM_YVIRTUALSCREEN),
-            GetSystemMetrics(SM_CXVIRTUALSCREEN) as u32,
-            GetSystemMetrics(SM_CYVIRTUALSCREEN) as u32,
-        )
+        if GetMonitorInfoW(monitor, &mut info) != 0 {
+            monitors.push((
+                info.rcMonitor.left,
+                info.rcMonitor.top,
+                (info.rcMonitor.right - info.rcMonitor.left) as u32,
+                (info.rcMonitor.bottom - info.rcMonitor.top) as u32,
+            ));
+        }
+        1
     }
-    #[cfg(not(windows))]
-    {
-        (0, 0, 1920, 1080)
+    unsafe {
+        EnumDisplayMonitors(
+            HDC::default(),
+            core::ptr::null(),
+            Some(collect_monitor),
+            &mut monitors as *mut _ as LPARAM,
+        );
     }
+    monitors
+        .get(monitor_number as usize - 1)
+        .copied()
+        .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidInput, "指定されたモニタ番号がありません"))
 }
 
 pub fn make_window(event_loop: &ActiveEventLoop, area: (i32, i32, u32, u32)) -> AppWindow {
@@ -58,23 +91,14 @@ pub fn make_window(event_loop: &ActiveEventLoop, area: (i32, i32, u32, u32)) -> 
             .create_window(attributes)
             .expect("イベント用ウインドウを作成できません"),
     );
-    #[cfg(windows)]
     {
         AppWindow {
             _event_window: event_window,
             hwnd: create_native_window(area),
         }
     }
-    #[cfg(not(windows))]
-    {
-        let _ = area;
-        AppWindow {
-            _event_window: event_window,
-        }
-    }
 }
 
-#[cfg(windows)]
 pub fn move_native_window(window: &AppWindow, x: i32, y: i32) {
     use windows_sys::Win32::UI::WindowsAndMessaging::{SetWindowPos, HWND_TOPMOST, SWP_NOACTIVATE};
     unsafe {
@@ -90,24 +114,13 @@ pub fn move_native_window(window: &AppWindow, x: i32, y: i32) {
     }
 }
 
-#[cfg(not(windows))]
-pub fn move_native_window(_window: &AppWindow, _x: i32, _y: i32) {}
-
-#[cfg(windows)]
 static NATIVE_CLOSE_REQUESTED: std::sync::atomic::AtomicBool =
     std::sync::atomic::AtomicBool::new(false);
 
-#[cfg(windows)]
 pub fn native_close_requested() -> bool {
     NATIVE_CLOSE_REQUESTED.swap(false, std::sync::atomic::Ordering::AcqRel)
 }
 
-#[cfg(not(windows))]
-pub fn native_close_requested() -> bool {
-    false
-}
-
-#[cfg(windows)]
 unsafe extern "system" fn native_window_proc(
     hwnd: windows_sys::Win32::Foundation::HWND,
     message: u32,
@@ -126,7 +139,6 @@ unsafe extern "system" fn native_window_proc(
     DefWindowProcW(hwnd, message, wparam, lparam)
 }
 
-#[cfg(windows)]
 fn create_native_window(area: (i32, i32, u32, u32)) -> *mut core::ffi::c_void {
     use windows_sys::Win32::System::LibraryLoader::GetModuleHandleW;
     use windows_sys::Win32::UI::WindowsAndMessaging::{

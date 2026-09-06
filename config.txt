@@ -5,3 +5,5 @@ anim_fps=5.0
 # frame_delays_msを指定した場合、anim_fpsは無視されます。
 frame_delays_ms=200,100,100,100,140
 speed=1.7
+# monitor=allで全モニタ、monitor=1やmonitor=2で指定したモニタのみを使用します。
+monitor=all
