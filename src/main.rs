@@ -14,7 +14,18 @@ use winit::event_loop::EventLoop;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     platform::set_process_dpi_awareness();
-    let config = config::read()?;
+    let config = match config::read() {
+        Ok(config) => config,
+        Err(error) => {
+            MessageDialog::new()
+                .set_level(MessageLevel::Error)
+                .set_title("Sinonome Bouncer")
+                .set_description(format!("設定ファイルの読み込みに失敗しました。\n{error}"))
+                .set_buttons(MessageButtons::Ok)
+                .show();
+            return Ok(());
+        }
+    };
     let animation_path = Path::new(config::ANIMATION_FILE);
     if !animation_path.exists() {
         MessageDialog::new()
@@ -45,7 +56,18 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             return Ok(());
         }
     };
-    let area = platform::virtual_work_area(config.monitor)?;
+    let area = match platform::virtual_work_area(config.monitor) {
+        Ok(area) => area,
+        Err(error) => {
+            MessageDialog::new()
+                .set_level(MessageLevel::Error)
+                .set_title("Sinonome Bouncer")
+                .set_description(format!("モニタの指定が不正です。\n{error}"))
+                .set_buttons(MessageButtons::Ok)
+                .show();
+            return Ok(());
+        }
+    };
     let (tray_icon, quit_item_id) = tray::setup(&atlas)?;
     let event_loop = EventLoop::new()?;
     let mut app = Bouncer::new(atlas, area, config.bounce_speed, tray_icon, quit_item_id);
