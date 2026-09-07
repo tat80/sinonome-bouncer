@@ -56,8 +56,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             return Ok(());
         }
     };
-    let area = match platform::virtual_work_area(config.monitor) {
-        Ok(area) => area,
+    let areas = match platform::work_areas(config.monitor) {
+        Ok(areas) => areas,
         Err(error) => {
             MessageDialog::new()
                 .set_level(MessageLevel::Error)
@@ -70,7 +70,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     };
     let (tray_icon, quit_item_id) = tray::setup(&atlas)?;
     let event_loop = EventLoop::new()?;
-    let mut app = Bouncer::new(atlas, area, config.bounce_speed, tray_icon, quit_item_id);
+    let mut app = Bouncer::new(atlas, areas, config.bounce_speed, tray_icon, quit_item_id);
     event_loop.run_app(&mut app)?;
     Ok(())
 }

@@ -25,25 +25,7 @@ pub fn set_process_dpi_awareness() {
     }
 }
 
-pub fn virtual_work_area(selection: MonitorSelection) -> io::Result<(i32, i32, u32, u32)> {
-    if selection == MonitorSelection::All {
-        unsafe {
-            use windows_sys::Win32::UI::WindowsAndMessaging::{
-                GetSystemMetrics, SM_CXVIRTUALSCREEN, SM_CYVIRTUALSCREEN, SM_XVIRTUALSCREEN,
-                SM_YVIRTUALSCREEN,
-            };
-            return Ok((
-                GetSystemMetrics(SM_XVIRTUALSCREEN),
-                GetSystemMetrics(SM_YVIRTUALSCREEN),
-                GetSystemMetrics(SM_CXVIRTUALSCREEN) as u32,
-                GetSystemMetrics(SM_CYVIRTUALSCREEN) as u32,
-            ));
-        }
-    }
-    let monitor_number = match selection {
-        MonitorSelection::Number(number) => number,
-        MonitorSelection::All => unreachable!(),
-    };
+pub fn work_areas(selection: MonitorSelection) -> io::Result<Vec<(i32, i32, u32, u32)>> {
     let mut monitors = Vec::new();
     unsafe extern "system" fn collect_monitor(
         monitor: HMONITOR,
@@ -74,10 +56,22 @@ pub fn virtual_work_area(selection: MonitorSelection) -> io::Result<(i32, i32, u
             &mut monitors as *mut _ as LPARAM,
         );
     }
-    monitors
-        .get(monitor_number as usize - 1)
-        .copied()
-        .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidInput, "指定されたモニタ番号がありません"))
+    match selection {
+        MonitorSelection::All => {
+            if monitors.is_empty() {
+                Err(io::Error::other("モニタを取得できませんでした"))
+            } else {
+                Ok(monitors)
+            }
+        }
+        MonitorSelection::Number(number) => monitors
+            .get(number as usize - 1)
+            .copied()
+            .map(|area| vec![area])
+            .ok_or_else(|| {
+                io::Error::new(io::ErrorKind::InvalidInput, "指定されたモニタ番号がありません")
+            }),
+    }
 }
 
 pub fn make_window(event_loop: &ActiveEventLoop, area: (i32, i32, u32, u32)) -> AppWindow {
