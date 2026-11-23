@@ -73,11 +73,11 @@ impl Bouncer {
             event_loop.exit();
             return;
         }
-        if let Ok(event) = MenuEvent::receiver().try_recv() {
-            if event.id == self.quit_item_id {
-                event_loop.exit();
-                return;
-            }
+        if let Ok(event) = MenuEvent::receiver().try_recv()
+            && event.id == self.quit_item_id
+        {
+            event_loop.exit();
+            return;
         }
         let now = Instant::now();
         let elapsed = now
@@ -98,11 +98,11 @@ impl Bouncer {
             false
         };
         let window_position = (self.position.0.round() as i32, self.position.1.round() as i32);
-        if self.last_window_position != Some(window_position) {
-            if let Some(window) = self.window.as_ref() {
-                platform::move_native_window(window, window_position.0, window_position.1);
-                self.last_window_position = Some(window_position);
-            }
+        if self.last_window_position != Some(window_position)
+            && let Some(window) = self.window.as_ref()
+        {
+            platform::move_native_window(window, window_position.0, window_position.1);
+            self.last_window_position = Some(window_position);
         }
         if frame_changed {
             self.redraw();

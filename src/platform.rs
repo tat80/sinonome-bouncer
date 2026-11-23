@@ -33,12 +33,12 @@ pub fn work_areas(selection: MonitorSelection) -> io::Result<Vec<(i32, i32, u32,
         _monitor_rect: *mut windows_sys::Win32::Foundation::RECT,
         data: LPARAM,
     ) -> BOOL {
-        let monitors = &mut *(data as *mut Vec<(i32, i32, u32, u32)>);
+        let monitors = unsafe { &mut *(data as *mut Vec<(i32, i32, u32, u32)>) };
         let mut info = MONITORINFO {
             cbSize: std::mem::size_of::<MONITORINFO>() as u32,
-            ..std::mem::zeroed()
+            ..unsafe { std::mem::zeroed() }
         };
-        if GetMonitorInfoW(monitor, &mut info) != 0 {
+        if unsafe { GetMonitorInfoW(monitor, &mut info) } != 0 {
             monitors.push((
                 info.rcMonitor.left,
                 info.rcMonitor.top,
@@ -94,16 +94,18 @@ pub fn make_window(event_loop: &ActiveEventLoop, area: (i32, i32, u32, u32)) -> 
 }
 
 pub fn move_native_window(window: &AppWindow, x: i32, y: i32) {
-    use windows_sys::Win32::UI::WindowsAndMessaging::{SetWindowPos, HWND_TOPMOST, SWP_NOACTIVATE};
+    use windows_sys::Win32::UI::WindowsAndMessaging::{
+        SetWindowPos, SWP_NOACTIVATE, SWP_NOSIZE, SWP_NOZORDER,
+    };
     unsafe {
         SetWindowPos(
             window.hwnd as _,
-            HWND_TOPMOST,
+            core::ptr::null_mut(),
             x,
             y,
             0,
             0,
-            SWP_NOACTIVATE | windows_sys::Win32::UI::WindowsAndMessaging::SWP_NOSIZE,
+            SWP_NOACTIVATE | SWP_NOSIZE | SWP_NOZORDER,
         );
     }
 }
@@ -126,11 +128,13 @@ unsafe extern "system" fn native_window_proc(
     };
     if message == WM_CLOSE {
         NATIVE_CLOSE_REQUESTED.store(true, std::sync::atomic::Ordering::Release);
-        DestroyWindow(hwnd);
-        PostQuitMessage(0);
+        unsafe {
+            DestroyWindow(hwnd);
+            PostQuitMessage(0);
+        }
         return 0;
     }
-    DefWindowProcW(hwnd, message, wparam, lparam)
+    unsafe { DefWindowProcW(hwnd, message, wparam, lparam) }
 }
 
 fn create_native_window(area: (i32, i32, u32, u32)) -> *mut core::ffi::c_void {
